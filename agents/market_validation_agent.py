@@ -21,7 +21,6 @@ Claimed Market Metrics:
 External Market Signals (0–100 each):
 - Google Trends Score: {trends}
 - News Frequency Score: {news}
-- GitHub Activity Score: {github}
 - Composite Signal Score: {composite}
 
 Scoring rubrics:
@@ -61,7 +60,6 @@ def run_market_validation_agent(
         advantages=", ".join(startup.competitive_advantages) or "None listed",
         trends=signals.google_trends_score,
         news=signals.news_frequency_score,
-        github=signals.github_activity_score,
         composite=signals.composite_signal_score,
     )
 

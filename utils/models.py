@@ -117,10 +117,10 @@ class InvestorPortfolio(BaseModel):
 # ─── Financial Simulation Outputs ────────────────────────────────────────────
 
 class FinancialSimulationResult(BaseModel):
-    runway_months: float
-    burn_multiple: float
+    runway_months: Optional[float]
+    burn_multiple: Optional[float]
     dilution_pct: float
-    bankruptcy_projection_months: float
+    bankruptcy_projection_months: Optional[float]
     capital_efficiency_ratio: float
 
 
@@ -129,7 +129,6 @@ class FinancialSimulationResult(BaseModel):
 class MarketSignals(BaseModel):
     google_trends_score: float      # 0-100
     news_frequency_score: float     # 0-100
-    github_activity_score: float    # 0-100 (for tech sectors)
     composite_signal_score: float   # 0-100 weighted average
 
 
@@ -159,9 +158,7 @@ class FounderIntelligenceOutput(BaseModel):
     key_founder_risks: list[str]
 
 
-class PortfolioFitOutput(BaseModel):
-    portfolio_fit_score: int = Field(ge=0, le=100)
-    overexposure_flag: bool
+
 
 
 class InvestmentDecisionOutput(BaseModel):
@@ -181,6 +178,5 @@ class DueDiligenceResult(BaseModel):
     financial_risk: FinancialRiskOutput
     market_validation: MarketValidationOutput
     founder_intelligence: FounderIntelligenceOutput
-    portfolio_fit: PortfolioFitOutput
     investment_decision: InvestmentDecisionOutput
     memo: str

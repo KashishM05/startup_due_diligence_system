@@ -27,28 +27,28 @@ def run_financial_simulation(startup: StartupProfile) -> FinancialSimulationResu
 
     # Runway: existing cash + new raise divided by net burn
     total_cash = existing_cash + raise_amount
-    runway_months = (total_cash / net_burn) if net_burn > 0 else 999.0
+    runway_months = (total_cash / net_burn) if net_burn > 0 else None
 
     # Burn multiple: amount burned per dollar of net new ARR
     # Net new ARR = revenue * growth_rate
     net_new_arr = revenue * growth_rate
     annual_burn = burn * 12.0
-    burn_multiple = (annual_burn / net_new_arr) if net_new_arr > 0 else 999.0
+    burn_multiple = (annual_burn / net_new_arr) if net_new_arr > 0 else None
 
     # Dilution: new shares / post-money * 100
     post_money_val = pre_money_val + raise_amount
     dilution_pct = (raise_amount / post_money_val) * 100.0
 
     # Bankruptcy projection: months until cash runs out WITHOUT new raise
-    bankruptcy_projection_months = (existing_cash / net_burn) if net_burn > 0 else 999.0
+    bankruptcy_projection_months = (existing_cash / net_burn) if net_burn > 0 else None
 
     # Capital efficiency ratio: ARR / total capital raised (raise + existing)
     capital_efficiency_ratio = revenue / total_cash if total_cash > 0 else 0.0
 
     return FinancialSimulationResult(
-        runway_months=round(runway_months, 1),
-        burn_multiple=round(burn_multiple, 2),
+        runway_months=round(runway_months, 1) if runway_months is not None else None,
+        burn_multiple=round(burn_multiple, 2) if burn_multiple is not None else None,
         dilution_pct=round(dilution_pct, 1),
-        bankruptcy_projection_months=round(bankruptcy_projection_months, 1),
+        bankruptcy_projection_months=round(bankruptcy_projection_months, 1) if bankruptcy_projection_months is not None else None,
         capital_efficiency_ratio=round(capital_efficiency_ratio, 4),
     )

@@ -27,7 +27,7 @@ Claims:
 - Pre-money Valuation: ${val:,.0f}
 - Growth Rate: {growth}% YoY
 
-Valuation sanity: ARR multiple = {arr_multiple:.1f}x (flag if >50x for stage)
+Valuation sanity: ARR multiple = {arr_multiple}x (flag if >50x for stage)
 
 Return exactly:
 {{
@@ -52,9 +52,9 @@ def run_financial_risk_agent(
     Returns:
         FinancialRiskOutput: Structured financial risk assessment.
     """
-    arr_multiple = 9999
+    arr_multiple = "N/A"
     if startup.pre_money_valuation_usd is not None and startup.revenue_usd > 0:
-        arr_multiple = startup.pre_money_valuation_usd / startup.revenue_usd
+        arr_multiple = f"{startup.pre_money_valuation_usd / startup.revenue_usd:.1f}"
 
     prompt = _PROMPT.format(
         company=startup.company_name,

@@ -69,38 +69,6 @@ def _get_news_score_cached(keyword: str) -> float:
         return _FALLBACK_SCORE
 
 
-# ─── GitHub Activity ──────────────────────────────────────────────────────────
-
-@lru_cache(maxsize=128)
-def _get_github_score_cached(keyword: str) -> float:
-    """Cached GitHub repository activity score for a technology/sector keyword.
-
-    Args:
-        keyword: Technology/sector keyword.
-
-    Returns:
-        float: Score 0–100 based on recent repo count and star activity.
-    """
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        logger.warning("GITHUB_TOKEN not set; using fallback.")
-        return _FALLBACK_SCORE
-    try:
-        from github import Github
-        g = Github(token)
-        repos = g.search_repositories(
-            query=f"{keyword} in:description,name",
-            sort="updated",
-            order="desc",
-        )
-        # Sample top 10 repos for stars
-        total_stars = sum(r.stargazers_count for r in repos[:10])
-        # Normalize: cap at 100k stars → 100
-        return min(float(total_stars) / 1000.0, 100.0)
-    except Exception as e:
-        logger.warning(f"GitHub fallback for '{keyword}': {e}")
-        return _FALLBACK_SCORE
-
 
 # ─── Public interface ─────────────────────────────────────────────────────────
 
@@ -120,17 +88,13 @@ def fetch_market_signals(sector: str, competitors: list[str]) -> dict:
     time.sleep(0.5)  # rate limit buffer between API calls
 
     news_score = _get_news_score_cached(keyword)
-    time.sleep(0.5)
-
-    github_score = _get_github_score_cached(keyword)
 
     composite = round(
-        0.40 * trends_score + 0.35 * news_score + 0.25 * github_score, 2
+        0.50 * trends_score + 0.50 * news_score, 2
     )
 
     return {
         "google_trends_score": round(trends_score, 2),
         "news_frequency_score": round(news_score, 2),
-        "github_activity_score": round(github_score, 2),
         "composite_signal_score": composite,
     }

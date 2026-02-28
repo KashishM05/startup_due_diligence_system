@@ -136,7 +136,7 @@ async def analyze(
 
 
 # ─── Serve frontend static files ──────────────────────────────────────────────
-_frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+_frontend_dir = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 if _frontend_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")
 

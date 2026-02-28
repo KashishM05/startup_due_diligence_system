@@ -28,16 +28,15 @@ SCORE DASHBOARD
 Financial Risk (Sustainability):   {{ r.financial_risk.sustainability_score }}/100
 Market Momentum:                   {{ r.market_validation.market_momentum_score }}/100
 Founder Intelligence:              {{ r.founder_intelligence.founder_intelligence_score }}/100
-Portfolio Fit:                     {{ r.portfolio_fit.portfolio_fit_score }}/100
 Competitive Opportunity:           {{ r.market_validation.competitive_saturation_score }}/100
 
 ────────────────────────────────────────────────────────────────────────────────
 FINANCIAL ANALYSIS
 ────────────────────────────────────────────────────────────────────────────────
-Runway:                     {{ r.financial_simulation.runway_months }} months (post-raise)
-Burn Multiple:              {{ r.financial_simulation.burn_multiple }}x
+Runway:                     {{ r.financial_simulation.runway_months ~ ' months' if r.financial_simulation.runway_months is not none else 'Infinite' }} (post-raise)
+Burn Multiple:              {{ r.financial_simulation.burn_multiple ~ 'x' if r.financial_simulation.burn_multiple is not none else 'N/A' }}
 Dilution (this round):      {{ r.financial_simulation.dilution_pct }}%
-Bankruptcy Projection:      {{ r.financial_simulation.bankruptcy_projection_months }} months (no raise)
+Bankruptcy Projection:      {{ r.financial_simulation.bankruptcy_projection_months ~ ' months' if r.financial_simulation.bankruptcy_projection_months is not none else 'Infinite' }} (no raise)
 Capital Efficiency Ratio:   {{ r.financial_simulation.capital_efficiency_ratio }}
 Valuation Realism Flag:     {{ "⚠️  FLAGGED" if r.financial_risk.valuation_realism_flag else "✓ OK" }}
 
@@ -55,7 +54,6 @@ Hype vs Evidence Delta:     {{ r.market_validation.hype_vs_evidence_delta }}
 External Signals:
   Google Trends Score:      {{ r.market_signals.google_trends_score }}/100
   News Frequency Score:     {{ r.market_signals.news_frequency_score }}/100
-  GitHub Activity Score:    {{ r.market_signals.github_activity_score }}/100
   Composite Signal:         {{ r.market_signals.composite_signal_score }}/100
 
 Key Market Risks:
@@ -74,12 +72,6 @@ Risk Level:                 {{ r.founder_intelligence.risk_level }}
 Key Founder Risks:
 {% for risk in r.founder_intelligence.key_founder_risks %}  • {{ risk }}
 {% endfor %}
-
-────────────────────────────────────────────────────────────────────────────────
-PORTFOLIO FIT
-────────────────────────────────────────────────────────────────────────────────
-Portfolio Fit Score:        {{ r.portfolio_fit.portfolio_fit_score }}/100
-Overexposure Flag:          {{ "⚠️  YES" if r.portfolio_fit.overexposure_flag else "✓ NO" }}
 
 ────────────────────────────────────────────────────────────────────────────────
 AGGREGATE KEY RISKS

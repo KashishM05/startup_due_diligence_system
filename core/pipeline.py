@@ -17,7 +17,6 @@ from core.memo_generator import generate_memo
 from agents.financial_risk_agent import run_financial_risk_agent
 from agents.market_validation_agent import run_market_validation_agent
 from agents.founder_intelligence_agent import run_founder_intelligence_agent
-from agents.portfolio_fit_module import run_portfolio_fit_module
 from agents.investment_decision_engine import run_investment_decision_engine
 
 _executor = ThreadPoolExecutor(max_workers=6)
@@ -38,7 +37,7 @@ async def run_pipeline(
     Execution order:
     1. Financial simulation + Market signals run concurrently (no dependencies).
     2. All three agents (financial risk, market validation, founder intelligence)
-       + portfolio fit run concurrently once their inputs are ready.
+       run concurrently once their inputs are ready.
     3. Investment decision engine runs after all scores are collected.
     4. Memo is generated deterministically.
 
@@ -69,19 +68,14 @@ async def run_pipeline(
     def _founder_intelligence():
         return run_founder_intelligence_agent(startup)
 
-    def _portfolio_fit():
-        return run_portfolio_fit_module(startup, portfolio)
-
     (
         financial_risk,
         market_validation,
         founder_intelligence,
-        portfolio_fit,
     ) = await asyncio.gather(
         _run_in_thread(_financial_risk),
         _run_in_thread(_market_validation),
         _run_in_thread(_founder_intelligence),
-        _run_in_thread(_portfolio_fit),
     )
 
     # ── Stage 3: Meta-agent decision ──────────────────────────────────────────
@@ -94,7 +88,6 @@ async def run_pipeline(
         financial_risk,
         market_validation,
         founder_intelligence,
-        portfolio_fit,
         portfolio,
     )
 
@@ -106,7 +99,6 @@ async def run_pipeline(
         financial_risk=financial_risk,
         market_validation=market_validation,
         founder_intelligence=founder_intelligence,
-        portfolio_fit=portfolio_fit,
         investment_decision=investment_decision,
         memo="",  # placeholder until generated below
     )
