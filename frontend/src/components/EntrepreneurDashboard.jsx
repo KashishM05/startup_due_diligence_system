@@ -1,0 +1,385 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+    Activity, LogOut, Wifi, WifiOff, Upload, FileText, LayoutTemplate,
+    ChevronRight, CheckCircle2, Search, Send, Clock, CheckCircle, Briefcase,
+    MapPin, DollarSign, Users, Linkedin, Download
+} from "lucide-react";
+import { api } from "../api";
+
+export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
+    const [tab, setTab] = useState("apply");
+    const [investors, setInvestors] = useState([]);
+    const [myApps, setMyApps] = useState([]);
+    const [files, setFiles] = useState({ pitchDeck: null, financials: null, founderProfile: null });
+    const [companyName, setCompanyName] = useState("");
+    const [linkedinUrl, setLinkedinUrl] = useState("");
+    const [selectedInvestors, setSelectedInvestors] = useState([]);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [success, setSuccess] = useState("");
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        api.getInvestors().then(setInvestors).catch(() => { });
+        api.getEntrepreneurApplications(user._id).then(setMyApps).catch(() => { });
+    }, [user._id]);
+
+    const handleFileChange = (e, key) => {
+        if (e.target.files[0]) {
+            setFiles((prev) => ({ ...prev, [key]: e.target.files[0] }));
+        }
+    };
+
+    const isLinkedinValid = /linkedin\.com\/in\//.test(linkedinUrl);
+    const allReady = files.pitchDeck && files.financials && files.founderProfile && selectedInvestors.length > 0 && companyName.trim() && isLinkedinValid;
+
+    const handleSubmit = async () => {
+        if (!allReady) return;
+        setSubmitting(true);
+        setError("");
+        setSuccess("");
+        try {
+            const names = [];
+            for (const inv of selectedInvestors) {
+                await api.submitApplication(
+                    user._id, user.name, inv._id,
+                    companyName, linkedinUrl,
+                    files.pitchDeck, files.financials, files.founderProfile
+                );
+                names.push(inv.name);
+            }
+            setSuccess(`Applications sent to ${names.join(", ")}!`);
+            setFiles({ pitchDeck: null, financials: null, founderProfile: null });
+            setSelectedInvestors([]);
+            setCompanyName("");
+            setLinkedinUrl("");
+            const apps = await api.getEntrepreneurApplications(user._id);
+            setMyApps(apps);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const filteredInvestors = investors.filter((inv) =>
+        inv.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (inv.sectors || []).some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    return (
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+            <Header user={user} apiOnline={apiOnline} onLogout={onLogout} />
+
+            <main className="container" style={{ flex: 1, padding: "2rem 2rem 4rem" }}>
+                {/* Tabs */}
+                <div style={{
+                    display: "flex", gap: "0.5rem", marginBottom: "2rem",
+                    background: "var(--bg-elevated)", borderRadius: "var(--radius-full)",
+                    padding: "4px", maxWidth: 300
+                }}>
+                    {[{ key: "apply", label: "Apply" }, { key: "status", label: "My Applications" }].map(t => (
+                        <button key={t.key} onClick={() => setTab(t.key)} style={{
+                            flex: 1, padding: "0.5rem 1rem", border: "none",
+                            borderRadius: "var(--radius-full)", cursor: "pointer",
+                            fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 600,
+                            background: tab === t.key ? "var(--bg-card)" : "transparent",
+                            color: tab === t.key ? "var(--charcoal)" : "var(--warm-gray)",
+                            boxShadow: tab === t.key ? "var(--shadow-sm)" : "none",
+                            transition: "all 0.2s ease"
+                        }}>{t.label}</button>
+                    ))}
+                </div>
+
+                {tab === "apply" && (
+                    <div className="animate-fadeUp">
+                        <h2 style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>Submit Your Startup</h2>
+                        <p style={{ color: "var(--warm-gray)", marginBottom: "2rem" }}>
+                            Upload your documents and apply to an investor for evaluation.
+                        </p>
+
+                        {/* Company Name + LinkedIn */}
+                        <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                <div>
+                                    <label>Company / Startup Name *</label>
+                                    <input type="text" placeholder="e.g. NexaPay Technologies"
+                                        value={companyName}
+                                        onChange={(e) => setCompanyName(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                        <Linkedin size={14} /> Founder LinkedIn URL *
+                                    </label>
+                                    <input type="url" placeholder="https://linkedin.com/in/yourprofile"
+                                        value={linkedinUrl}
+                                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                                        style={{
+                                            borderColor: linkedinUrl && !isLinkedinValid ? "var(--terracotta)" : undefined
+                                        }}
+                                    />
+                                    {linkedinUrl && !isLinkedinValid && (
+                                        <span style={{ fontSize: "0.72rem", color: "var(--terracotta)", marginTop: "0.2rem", display: "block" }}>
+                                            Must be a valid LinkedIn profile URL (linkedin.com/in/…)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* File Uploads */}
+                        <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                <h3 style={{ fontSize: "1.1rem" }}>Upload Documents</h3>
+                                <button className="btn" onClick={() => {
+                                    const csv = `Metric,Current,Projected\nAnnual Revenue,,\nMonthly Burn Rate,,\nExisting Cash on Hand,,\nTarget Raise Amount,,\nPre-Money Valuation,,\nAnnual Growth Rate,,\nTAM,,`;
+                                    const blob = new Blob([csv], { type: "text/csv" });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url; a.download = "financial_template.csv";
+                                    a.click(); URL.revokeObjectURL(url);
+                                }} style={{ padding: "0.35rem 0.85rem", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                    <Download size={13} /> CSV Template
+                                </button>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+                                <MiniUpload label="Pitch Deck" accept=".pdf" file={files.pitchDeck}
+                                    onChange={(e) => handleFileChange(e, "pitchDeck")} Icon={LayoutTemplate} color="var(--terracotta)" />
+                                <MiniUpload label="Financials" accept=".csv,.xlsx,.xls" file={files.financials}
+                                    onChange={(e) => handleFileChange(e, "financials")} Icon={FileText} color="var(--olive)" />
+                                <MiniUpload label="Founder Profile" accept=".pdf" file={files.founderProfile}
+                                    onChange={(e) => handleFileChange(e, "founderProfile")} Icon={Upload} color="var(--gold)" />
+                            </div>
+                        </div>
+
+                        {/* Investor Selection */}
+                        <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                <h3 style={{ fontSize: "1.1rem" }}>Select Investors</h3>
+                                {selectedInvestors.length > 0 && (
+                                    <span className="badge badge--green" style={{ fontSize: "0.72rem" }}>
+                                        {selectedInvestors.length} selected
+                                    </span>
+                                )}
+                            </div>
+
+                            <div style={{ position: "relative", marginBottom: "1rem" }}>
+                                <Search size={16} style={{
+                                    position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+                                    color: "var(--warm-gray)"
+                                }} />
+                                <input type="text" placeholder="Search by name or sector…"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    style={{ paddingLeft: "2.25rem" }}
+                                />
+                            </div>
+
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: 320, overflowY: "auto" }}>
+                                {filteredInvestors.map(inv => {
+                                    const isSelected = selectedInvestors.some(s => s._id === inv._id);
+                                    return (
+                                        <div key={inv._id} onClick={() => {
+                                            setSelectedInvestors(prev =>
+                                                isSelected
+                                                    ? prev.filter(s => s._id !== inv._id)
+                                                    : [...prev, inv]
+                                            );
+                                        }}
+                                            style={{
+                                                display: "flex", alignItems: "center", gap: "1rem",
+                                                padding: "1rem", borderRadius: "var(--radius-sm)",
+                                                border: `2px solid ${isSelected ? "var(--terracotta)" : "var(--light-border)"}`,
+                                                background: isSelected ? "var(--terracotta-light)" : "var(--bg-card)",
+                                                cursor: "pointer", transition: "all 0.2s ease"
+                                            }}>
+                                            {/* Checkbox indicator */}
+                                            <div style={{
+                                                width: 22, height: 22, borderRadius: 4, flexShrink: 0,
+                                                border: `2px solid ${isSelected ? "var(--terracotta)" : "var(--light-border)"}`,
+                                                background: isSelected ? "var(--terracotta)" : "transparent",
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                transition: "all 0.2s ease"
+                                            }}>
+                                                {isSelected && <CheckCircle2 size={14} color="#fff" />}
+                                            </div>
+                                            <div style={{
+                                                width: 44, height: 44, borderRadius: "50%",
+                                                background: "var(--bg-elevated)", display: "flex",
+                                                alignItems: "center", justifyContent: "center",
+                                                fontWeight: 700, fontSize: "1rem", color: "var(--charcoal)",
+                                                flexShrink: 0
+                                            }}>
+                                                {inv.name.charAt(0)}
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{inv.name}</div>
+                                                <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.2rem" }}>
+                                                    <span style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                                                        <Briefcase size={12} /> {inv.investor_type?.replace("_", " ")}
+                                                    </span>
+                                                    <span style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                                                        <MapPin size={12} /> {(inv.geographies || []).join(", ")}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: "0.72rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
+                                                    Sectors: {(inv.sectors || []).join(", ")}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {filteredInvestors.length === 0 && (
+                                    <p style={{ textAlign: "center", color: "var(--warm-gray)", padding: "1rem" }}>No investors found.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Status Messages */}
+                        {error && <div style={{ padding: "0.75rem 1rem", borderRadius: "var(--radius-sm)", background: "var(--danger-bg)", color: "var(--terracotta-dark)", fontSize: "0.9rem", marginBottom: "1rem" }}>{error}</div>}
+                        {success && <div style={{ padding: "0.75rem 1rem", borderRadius: "var(--radius-sm)", background: "var(--success-bg)", color: "var(--olive-dark)", fontSize: "0.9rem", marginBottom: "1rem" }}>{success}</div>}
+
+                        {/* Submit */}
+                        <div style={{ display: "flex", justifyContent: "center" }}>
+                            <button className="btn btn--accent" onClick={handleSubmit} disabled={!allReady || submitting}
+                                style={{ padding: "0.85rem 2.5rem", fontSize: "1rem" }}>
+                                <Send size={18} /> {submitting ? "Submitting…" : `Submit to ${selectedInvestors.length || 0} Investor${selectedInvestors.length !== 1 ? "s" : ""}`}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {tab === "status" && (
+                    <div className="animate-fadeUp">
+                        <h2 style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>My Applications</h2>
+                        <p style={{ color: "var(--warm-gray)", marginBottom: "2rem" }}>
+                            Track the status of your submitted applications.
+                        </p>
+
+                        {myApps.length === 0 ? (
+                            <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
+                                <p style={{ color: "var(--warm-gray)", fontSize: "1.1rem" }}>No applications yet.</p>
+                                <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem", marginTop: "0.5rem" }}>Submit your first application from the "Apply" tab.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                {myApps.map(app => {
+                                    const badgeClass = app.status === "approved" ? "badge--green"
+                                        : app.status === "rejected" ? ""
+                                            : app.status === "analyzed" ? "badge--green"
+                                                : "badge--yellow";
+                                    const badgeLabel = app.status === "approved" ? "✅ Approved"
+                                        : app.status === "rejected" ? "❌ Declined"
+                                            : app.status === "analyzed" ? "Analyzed"
+                                                : "Pending";
+
+                                    return (
+                                        <div key={app._id} className="card" style={{ padding: "1.25rem 1.5rem" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>{app.company_name}</div>
+                                                    <div style={{ fontSize: "0.85rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
+                                                        Sent to: <strong>{app.investor_name}</strong>
+                                                    </div>
+                                                    {app.linkedin_url && (
+                                                        <div style={{ fontSize: "0.75rem", color: "var(--olive)", marginTop: "0.15rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                                            <Linkedin size={11} /> LinkedIn linked
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className={`badge ${badgeClass}`}
+                                                    style={app.status === "rejected" ? { background: "var(--danger-bg)", color: "var(--terracotta-dark)" } : {}}>
+                                                    {app.status === "analyzed" ? <><CheckCircle size={12} /> {badgeLabel}</> : <><Clock size={12} /> {badgeLabel}</>}
+                                                </span>
+                                            </div>
+
+                                            {/* Decision message from investor */}
+                                            {app.decision_message && (
+                                                <div style={{
+                                                    marginTop: "0.75rem", padding: "0.85rem 1rem",
+                                                    borderRadius: "var(--radius-sm)",
+                                                    background: app.status === "approved" ? "var(--success-bg)" : "var(--danger-bg)",
+                                                    fontSize: "0.9rem",
+                                                    color: app.status === "approved" ? "var(--olive-dark)" : "var(--terracotta-dark)",
+                                                    lineHeight: 1.5
+                                                }}>
+                                                    {app.decision_message}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+}
+
+/* ─── Shared Header ──────────────────────────────────────────────────────────── */
+export function Header({ user, apiOnline, onLogout }) {
+    return (
+        <header style={{
+            padding: "1rem 0", background: "rgba(250,247,242,0.85)",
+            backdropFilter: "blur(12px)", borderBottom: "1px solid var(--light-border)",
+            position: "sticky", top: 0, zIndex: 50
+        }}>
+            <div className="container" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <img src="/cynt-logo.png" alt="Cynt" style={{
+                        width: 36, height: 36, borderRadius: "var(--radius-sm)",
+                        objectFit: "contain"
+                    }} />
+                    <div>
+                        <h1 style={{ fontSize: "1rem", fontFamily: "var(--font-display)", lineHeight: 1 }}>Cynt</h1>
+                        <span style={{ fontSize: "0.6rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--warm-gray)" }}>
+                            {user.role === "investor" ? "Investor Portal" : "Entrepreneur Portal"}
+                        </span>
+                    </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--charcoal)" }}>
+                        {user.name}
+                    </span>
+                    <div style={{
+                        display: "flex", alignItems: "center", gap: "0.3rem",
+                        fontSize: "0.72rem", fontWeight: 600,
+                        color: apiOnline ? "var(--olive)" : "var(--terracotta)"
+                    }}>
+                        {apiOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+                    </div>
+                    <button onClick={onLogout} className="btn" style={{
+                        padding: "0.4rem 0.85rem", fontSize: "0.8rem"
+                    }}>
+                        <LogOut size={14} /> Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+    );
+}
+
+/* ─── Mini Upload Box ─────────────────────────────────────────────────────────── */
+function MiniUpload({ label, accept, file, onChange, Icon, color }) {
+    const ref = useRef(null);
+    return (
+        <div onClick={() => ref.current?.click()} style={{
+            border: `2px dashed ${file ? color : "var(--medium-border)"}`,
+            borderRadius: "var(--radius-sm)", padding: "1.25rem 0.75rem",
+            textAlign: "center", cursor: "pointer",
+            background: file ? `${color}08` : "var(--bg-card)",
+            transition: "all 0.2s ease",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem"
+        }}>
+            {file ? <CheckCircle2 size={22} color={color} /> : <Icon size={20} color="var(--warm-gray)" />}
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>{label}</span>
+            <span style={{ fontSize: "0.7rem", color: "var(--warm-gray)" }}>
+                {file ? file.name : accept}
+            </span>
+            <input type="file" accept={accept} ref={ref} onChange={onChange} style={{ display: "none" }} />
+        </div>
+    );
+}
