@@ -1,8 +1,5 @@
-const API_BASE_URL = window.location.origin === "http://localhost:5173"
-    ? "http://localhost:8000"
-    : window.location.origin.includes("localhost:51")
-        ? "http://localhost:8000"
-        : window.location.origin;
+const _isLocalDev = window.location.port >= "5170" && window.location.port <= "5180";
+const API_BASE_URL = _isLocalDev ? "http://localhost:8000" : window.location.origin;
 
 async function _json(res) {
     if (!res.ok) {
