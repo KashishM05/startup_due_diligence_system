@@ -16,18 +16,14 @@ export default function WizardLayout({ currentStep, apiOnline, children }) {
             }}>
                 <div className="container" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        {/* Geometric logo */}
-                        <div style={{
+                        {/* Logo */}
+                        <img src="/cynt-logo.png" alt="Cynt" style={{
                             width: 40, height: 40, borderRadius: "var(--radius-sm)",
-                            background: "var(--charcoal)", display: "flex",
-                            alignItems: "center", justifyContent: "center",
-                            boxShadow: "var(--shadow-sm)"
-                        }}>
-                            <Activity size={20} color="#FAF7F2" strokeWidth={2.5} />
-                        </div>
+                            boxShadow: "var(--shadow-sm)", objectFit: "contain"
+                        }} />
                         <div>
                             <h1 style={{ fontSize: "1.15rem", fontFamily: "var(--font-display)", lineHeight: 1 }}>
-                                Due Diligence
+                                Cynt
                             </h1>
                             <span style={{
                                 fontSize: "0.65rem", fontWeight: 600,
@@ -124,7 +120,7 @@ export default function WizardLayout({ currentStep, apiOnline, children }) {
                 color: "var(--warm-gray)", fontWeight: 500,
                 background: "rgba(250, 247, 242, 0.6)"
             }}>
-                Built with AI-Powered Analysis Engine &middot; Due Diligence Platform
+                Built with AI-Powered Analysis Engine &middot; Cynt Platform
             </footer>
         </div>
     );

@@ -63,16 +63,13 @@ export default function LoginPage({ onLogin, apiOnline }) {
             <div className="animate-fadeUp" style={{ width: "100%", maxWidth: 480, padding: "2rem" }}>
                 {/* Logo */}
                 <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
-                    <div style={{
+                    <img src="/cynt-logo.png" alt="Cynt" style={{
                         width: 56, height: 56, borderRadius: "var(--radius-md)",
-                        background: "var(--charcoal)", display: "inline-flex",
-                        alignItems: "center", justifyContent: "center",
-                        boxShadow: "var(--shadow-md)", marginBottom: "1rem"
-                    }}>
-                        <Activity size={28} color="#FAF7F2" />
-                    </div>
-                    <h1 style={{ fontSize: "1.8rem", marginBottom: "0.3rem" }}>Due Diligence Engine</h1>
-                    <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>AI-Powered Investment Evaluation</p>
+                        boxShadow: "var(--shadow-md)", marginBottom: "1rem",
+                        objectFit: "contain"
+                    }} />
+                    <h1 style={{ fontSize: "1.8rem", marginBottom: "0.3rem" }}>Cynt</h1>
+                    <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>AI-Powered Investment Intelligence</p>
                 </div>
 
                 {/* Card */}

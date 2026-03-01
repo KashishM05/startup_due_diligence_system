@@ -1,12 +1,50 @@
-import React, { useRef } from "react";
+import React, { useState, useRef } from "react";
 import html2pdf from "html2pdf.js";
 import {
     Download, RefreshCw, FileText, CheckCircle, AlertTriangle,
-    TrendingUp, Activity, Shield, Target, Users, BarChart3, Zap
+    TrendingUp, Activity, Shield, Target, Users, BarChart3, Zap,
+    Info, ChevronDown, ChevronUp
 } from "lucide-react";
+import {
+    RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend
+} from "recharts";
+
+// ─── Metric explanation data ────────────────────────────────────────────────
+
+const FINANCIAL_EXPLANATIONS = [
+    { metric: "Runway", meaning: "The number of months a startup can continue operating before running out of cash, assuming current burn rate and available funds.", interpretation: "18+ months = healthy; 12–18 = adequate; <12 = concerning. Longer is always better — it means more time to iterate and reach milestones." },
+    { metric: "Burn Multiple", meaning: "How much money is burned to generate each dollar of net new annual recurring revenue (ARR). Formula: Annual Burn / Net New ARR.", interpretation: "<1x = excellent efficiency; 1–2x = good; 2–4x = average; >4x = inefficient. Lower is better — it shows capital-efficient growth." },
+    { metric: "Bankruptcy Projection", meaning: "Months until cash runs out WITHOUT new fundraising — only existing cash divided by net burn.", interpretation: "This is the 'worst-case' scenario. If <6 months, the company is extremely dependent on this fundraise closing." },
+    { metric: "Capital Efficiency", meaning: "Revenue generated per dollar of total capital (existing cash + raise). Formula: Revenue / Total Capital.", interpretation: ">0.5 = strong revenue relative to capital; 0.1–0.5 = developing; <0.1 = pre-revenue or very capital-intensive." },
+    { metric: "Valuation Flag", meaning: "Whether the pre-money valuation appears unrealistic relative to revenue, stage, and sector benchmarks.", interpretation: "✓ OK = valuation is reasonable. ⚠ Flagged = valuation may be overly optimistic and warrants negotiation." },
+];
+
+const MARKET_FOUNDER_EXPLANATIONS = [
+    { metric: "Market Momentum", meaning: "Real-world demand signal based on Google Trends data, news coverage, and growth plausibility.", interpretation: "70–100 = strong market tailwinds; 40–69 = moderate interest; <40 = weak or declining demand." },
+    { metric: "Hype vs Evidence", meaning: "The delta between claimed growth rate and actual market evidence. Positive = more hype than substance.", interpretation: "Close to 0 = claims match evidence. Large positive = founder may be over-promising. Negative = under-selling (rare but positive signal)." },
+    { metric: "Competitive Saturation", meaning: "How crowded the market is. Higher = less competition. Considers named competitors, sector density, and market signals.", interpretation: "80–100 = blue ocean (very rare); 50–79 = moderate competition; <50 = crowded 'red ocean' market." },
+    { metric: "Founder Risk Level", meaning: "Overall risk assessment of the founding team based on experience, domain fit, network, and execution track record.", interpretation: "LOW = strong founding team; MEDIUM = some gaps but manageable; HIGH = significant concerns about execution capability." },
+    { metric: "Domain Fit", meaning: "How well the founder's background and experience align with the startup's sector and stage.", interpretation: "70–100 = strong domain expertise; 40–69 = adjacent experience; <40 = limited relevant background." },
+];
+
+const RISKS_EXPLANATION = "Key risks are the most critical factors that could cause the investment to underperform or fail. They are ranked by the AI's assessment of likelihood and impact. Address these in due diligence conversations with the founding team.";
+
+const MILESTONES_EXPLANATION = "Required milestones are specific achievements the startup should reach before or shortly after investment. They serve as checkpoints and may be tied to tranche releases or follow-on investment decisions.";
+
+// ─── Chart color palette ────────────────────────────────────────────────────
+
+const CHART_COLORS = ["#c1553b", "#6b7f3b", "#d4a843", "#8B6F47", "#5a7d7c"];
+const RADAR_COLOR = "#c1553b";
 
 export default function Step4_Results({ result, onReset }) {
     const memoRef = useRef(null);
+    const [expandedSections, setExpandedSections] = useState({});
+
+    const toggleSection = (key) => {
+        setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const downloadPDF = () => {
         const element = memoRef.current;
@@ -42,6 +80,27 @@ export default function Step4_Results({ result, onReset }) {
 
     // Score color
     const scoreColor = d.decision_score >= 70 ? "var(--olive)" : d.decision_score >= 40 ? "var(--gold)" : "var(--terracotta)";
+
+    // ─── Chart data ────────────────────────────────────────────────────────
+    const radarData = [
+        { subject: "Decision", value: d.decision_score, fullMark: 100 },
+        { subject: "Financial", value: fr.sustainability_score, fullMark: 100 },
+        { subject: "Market", value: mv.market_momentum_score, fullMark: 100 },
+        { subject: "Competition", value: mv.competitive_saturation_score, fullMark: 100 },
+        { subject: "Founder", value: fi.founder_intelligence_score, fullMark: 100 },
+    ];
+
+    const financialBarData = [
+        { name: "Runway (mo)", value: sim.runway_months ?? 0, benchmark: 18 },
+        { name: "Burn Multiple", value: sim.burn_multiple ?? 0, benchmark: 2 },
+        { name: "Cap. Efficiency", value: (sim.capital_efficiency_ratio ?? 0) * 100, benchmark: 50 },
+    ];
+
+    const founderPieData = [
+        { name: "Domain Fit", value: fi.domain_fit_score },
+        { name: "Network", value: fi.network_strength_score },
+        { name: "Execution", value: fi.execution_credibility_score },
+    ];
 
     return (
         <div className="animate-fadeUp">
@@ -130,6 +189,43 @@ export default function Step4_Results({ result, onReset }) {
                 </div>
             </div>
 
+            {/* ═══ Radar Chart — Overall Assessment ═══ */}
+            <div className="card" style={{ padding: "1.75rem", marginBottom: "1.5rem" }}>
+                <div style={{
+                    display: "flex", alignItems: "center", gap: "0.6rem",
+                    marginBottom: "1rem"
+                }}>
+                    <div style={{
+                        width: 32, height: 32, borderRadius: "var(--radius-sm)",
+                        background: "var(--bg-elevated)", display: "flex",
+                        alignItems: "center", justifyContent: "center"
+                    }}>
+                        <Activity size={16} color="var(--charcoal)" />
+                    </div>
+                    <h3 style={{ fontSize: "1.1rem" }}>Overall Assessment Radar</h3>
+                </div>
+                <div style={{ width: "100%", height: 300 }}>
+                    <ResponsiveContainer>
+                        <RadarChart data={radarData} outerRadius="75%">
+                            <PolarGrid stroke="var(--light-border)" />
+                            <PolarAngleAxis
+                                dataKey="subject"
+                                tick={{ fill: "var(--warm-gray)", fontSize: 12, fontFamily: "var(--font-body)" }}
+                            />
+                            <PolarRadiusAxis
+                                angle={90} domain={[0, 100]}
+                                tick={{ fill: "var(--warm-gray)", fontSize: 10 }}
+                            />
+                            <Radar
+                                name="Score" dataKey="value"
+                                stroke={RADAR_COLOR} fill={RADAR_COLOR} fillOpacity={0.2}
+                                strokeWidth={2}
+                            />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
             {/* Metrics Grid */}
             <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr",
@@ -137,20 +233,18 @@ export default function Step4_Results({ result, onReset }) {
             }}>
                 {/* Financial Card */}
                 <div className="card" style={{ padding: "1.75rem" }}>
-                    <div style={{
-                        display: "flex", alignItems: "center", gap: "0.6rem",
-                        marginBottom: "1.25rem", paddingBottom: "0.75rem",
-                        borderBottom: "1px solid var(--light-border)"
-                    }}>
-                        <div style={{
-                            width: 32, height: 32, borderRadius: "var(--radius-sm)",
-                            background: "var(--terracotta-light)", display: "flex",
-                            alignItems: "center", justifyContent: "center"
-                        }}>
-                            <BarChart3 size={16} color="var(--terracotta)" />
-                        </div>
-                        <h3 style={{ fontSize: "1.1rem" }}>Financial Profile</h3>
-                    </div>
+                    <SectionHeader
+                        icon={<BarChart3 size={16} color="var(--terracotta)" />}
+                        iconBg="var(--terracotta-light)"
+                        title="Financial Profile"
+                        sectionKey="financial"
+                        expanded={expandedSections.financial}
+                        onToggle={toggleSection}
+                    />
+
+                    {expandedSections.financial && (
+                        <ExplanationPanel explanations={FINANCIAL_EXPLANATIONS} />
+                    )}
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                         <MetricRow label="Runway" value={fmtFallback(sim.runway_months, " mo")} />
@@ -164,24 +258,45 @@ export default function Step4_Results({ result, onReset }) {
                             </span>
                         </div>
                     </div>
+
+                    {/* Financial Bar Chart */}
+                    <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid var(--light-border)" }}>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warm-gray)", marginBottom: "0.5rem" }}>
+                            vs Benchmarks
+                        </div>
+                        <div style={{ width: "100%", height: 160 }}>
+                            <ResponsiveContainer>
+                                <BarChart data={financialBarData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                                    <XAxis type="number" tick={{ fontSize: 10, fill: "var(--warm-gray)" }} />
+                                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: "var(--charcoal)" }} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            background: "var(--bg-card)", border: "1px solid var(--light-border)",
+                                            borderRadius: "8px", fontSize: "0.82rem", fontFamily: "var(--font-body)"
+                                        }}
+                                    />
+                                    <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} name="Actual" />
+                                    <Bar dataKey="benchmark" fill="var(--light-border)" radius={[0, 4, 4, 0]} name="Benchmark" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Market & Founder Card */}
                 <div className="card" style={{ padding: "1.75rem" }}>
-                    <div style={{
-                        display: "flex", alignItems: "center", gap: "0.6rem",
-                        marginBottom: "1.25rem", paddingBottom: "0.75rem",
-                        borderBottom: "1px solid var(--light-border)"
-                    }}>
-                        <div style={{
-                            width: 32, height: 32, borderRadius: "var(--radius-sm)",
-                            background: "var(--olive-light)", display: "flex",
-                            alignItems: "center", justifyContent: "center"
-                        }}>
-                            <Target size={16} color="var(--olive)" />
-                        </div>
-                        <h3 style={{ fontSize: "1.1rem" }}>Market & Founder</h3>
-                    </div>
+                    <SectionHeader
+                        icon={<Target size={16} color="var(--olive)" />}
+                        iconBg="var(--olive-light)"
+                        title="Market & Founder"
+                        sectionKey="market"
+                        expanded={expandedSections.market}
+                        onToggle={toggleSection}
+                    />
+
+                    {expandedSections.market && (
+                        <ExplanationPanel explanations={MARKET_FOUNDER_EXPLANATIONS} />
+                    )}
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                         <MetricRow label="Market Momentum" value={`${mv.market_momentum_score}/100`} />
@@ -199,6 +314,38 @@ export default function Step4_Results({ result, onReset }) {
                         </div>
                         <MetricRow label="Domain Fit" value={`${fi.domain_fit_score}/100`} />
                     </div>
+
+                    {/* Founder Pie Chart */}
+                    <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid var(--light-border)" }}>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warm-gray)", marginBottom: "0.5rem" }}>
+                            Founder Score Breakdown
+                        </div>
+                        <div style={{ width: "100%", height: 200 }}>
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie
+                                        data={founderPieData} cx="50%" cy="50%"
+                                        innerRadius={45} outerRadius={75}
+                                        paddingAngle={3} dataKey="value"
+                                        label={({ name, value }) => `${value}`}
+                                    >
+                                        {founderPieData.map((_, idx) => (
+                                            <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{
+                                            background: "var(--bg-card)", border: "1px solid var(--light-border)",
+                                            borderRadius: "8px", fontSize: "0.82rem"
+                                        }}
+                                    />
+                                    <Legend
+                                        wrapperStyle={{ fontSize: "0.78rem", fontFamily: "var(--font-body)" }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -208,16 +355,25 @@ export default function Step4_Results({ result, onReset }) {
                 gap: "1.5rem", marginBottom: "2rem"
             }}>
                 <div className="card" style={{ padding: "1.75rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
+                    <SectionHeader
+                        icon={<AlertTriangle size={16} color="var(--terracotta)" />}
+                        iconBg="var(--danger-bg)"
+                        title="Key Risks"
+                        sectionKey="risks"
+                        expanded={expandedSections.risks}
+                        onToggle={toggleSection}
+                    />
+
+                    {expandedSections.risks && (
                         <div style={{
-                            width: 32, height: 32, borderRadius: "var(--radius-sm)",
-                            background: "var(--danger-bg)", display: "flex",
-                            alignItems: "center", justifyContent: "center"
+                            padding: "0.75rem 1rem", marginBottom: "0.75rem",
+                            background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
+                            fontSize: "0.82rem", color: "var(--warm-gray)", lineHeight: 1.6
                         }}>
-                            <AlertTriangle size={16} color="var(--terracotta)" />
+                            {RISKS_EXPLANATION}
                         </div>
-                        <h3 style={{ fontSize: "1.1rem" }}>Key Risks</h3>
-                    </div>
+                    )}
+
                     <ul style={{
                         paddingLeft: "1.25rem", display: "flex",
                         flexDirection: "column", gap: "0.4rem"
@@ -232,16 +388,25 @@ export default function Step4_Results({ result, onReset }) {
                 </div>
 
                 <div className="card" style={{ padding: "1.75rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
+                    <SectionHeader
+                        icon={<CheckCircle size={16} color="var(--olive)" />}
+                        iconBg="var(--success-bg)"
+                        title="Required Milestones"
+                        sectionKey="milestones"
+                        expanded={expandedSections.milestones}
+                        onToggle={toggleSection}
+                    />
+
+                    {expandedSections.milestones && (
                         <div style={{
-                            width: 32, height: 32, borderRadius: "var(--radius-sm)",
-                            background: "var(--success-bg)", display: "flex",
-                            alignItems: "center", justifyContent: "center"
+                            padding: "0.75rem 1rem", marginBottom: "0.75rem",
+                            background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
+                            fontSize: "0.82rem", color: "var(--warm-gray)", lineHeight: 1.6
                         }}>
-                            <CheckCircle size={16} color="var(--olive)" />
+                            {MILESTONES_EXPLANATION}
                         </div>
-                        <h3 style={{ fontSize: "1.1rem" }}>Required Milestones</h3>
-                    </div>
+                    )}
+
                     <ul style={{
                         paddingLeft: "1.25rem", display: "flex",
                         flexDirection: "column", gap: "0.4rem"
@@ -303,6 +468,68 @@ export default function Step4_Results({ result, onReset }) {
     );
 }
 
+/* ─── Section Header with Info Toggle ─────────────────────────────────────── */
+function SectionHeader({ icon, iconBg, title, sectionKey, expanded, onToggle }) {
+    return (
+        <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            marginBottom: "1.25rem", paddingBottom: "0.75rem",
+            borderBottom: "1px solid var(--light-border)"
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <div style={{
+                    width: 32, height: 32, borderRadius: "var(--radius-sm)",
+                    background: iconBg, display: "flex",
+                    alignItems: "center", justifyContent: "center"
+                }}>
+                    {icon}
+                </div>
+                <h3 style={{ fontSize: "1.1rem" }}>{title}</h3>
+            </div>
+            <button
+                onClick={() => onToggle(sectionKey)}
+                style={{
+                    border: "none", background: expanded ? "var(--bg-elevated)" : "transparent",
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
+                    padding: "0.3rem 0.65rem", borderRadius: "var(--radius-full)",
+                    color: "var(--warm-gray)", fontSize: "0.72rem", fontWeight: 600,
+                    fontFamily: "var(--font-body)", transition: "all 0.2s ease"
+                }}
+            >
+                <Info size={12} />
+                {expanded ? "Hide" : "What do these mean?"}
+                {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+        </div>
+    );
+}
+
+/* ─── Explanation Panel ───────────────────────────────────────────────────── */
+function ExplanationPanel({ explanations }) {
+    return (
+        <div style={{
+            marginBottom: "1rem", padding: "1rem",
+            background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
+            display: "flex", flexDirection: "column", gap: "0.75rem"
+        }}>
+            {explanations.map((item, i) => (
+                <div key={i}>
+                    <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--charcoal)", marginBottom: "0.15rem" }}>
+                        {item.metric}
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", lineHeight: 1.5 }}>
+                        <strong>What it is:</strong> {item.meaning}
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", lineHeight: 1.5 }}>
+                        <strong>How to read:</strong> {item.interpretation}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/* ─── Metric Row ──────────────────────────────────────────────────────────── */
 function MetricRow({ label, value }) {
     return (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
     Activity, LogOut, Wifi, WifiOff, Upload, FileText, LayoutTemplate,
     ChevronRight, CheckCircle2, Search, Send, Clock, CheckCircle, Briefcase,
-    MapPin, DollarSign, Users, Linkedin
+    MapPin, DollarSign, Users, Linkedin, Download
 } from "lucide-react";
 import { api } from "../api";
 
@@ -13,7 +13,7 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
     const [files, setFiles] = useState({ pitchDeck: null, financials: null, founderProfile: null });
     const [companyName, setCompanyName] = useState("");
     const [linkedinUrl, setLinkedinUrl] = useState("");
-    const [selectedInvestor, setSelectedInvestor] = useState(null);
+    const [selectedInvestors, setSelectedInvestors] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState("");
@@ -31,7 +31,7 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
     };
 
     const isLinkedinValid = /linkedin\.com\/in\//.test(linkedinUrl);
-    const allReady = files.pitchDeck && files.financials && files.founderProfile && selectedInvestor && companyName.trim() && isLinkedinValid;
+    const allReady = files.pitchDeck && files.financials && files.founderProfile && selectedInvestors.length > 0 && companyName.trim() && isLinkedinValid;
 
     const handleSubmit = async () => {
         if (!allReady) return;
@@ -39,14 +39,18 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
         setError("");
         setSuccess("");
         try {
-            await api.submitApplication(
-                user._id, user.name, selectedInvestor._id,
-                companyName, linkedinUrl,
-                files.pitchDeck, files.financials, files.founderProfile
-            );
-            setSuccess(`Application sent to ${selectedInvestor.name}!`);
+            const names = [];
+            for (const inv of selectedInvestors) {
+                await api.submitApplication(
+                    user._id, user.name, inv._id,
+                    companyName, linkedinUrl,
+                    files.pitchDeck, files.financials, files.founderProfile
+                );
+                names.push(inv.name);
+            }
+            setSuccess(`Applications sent to ${names.join(", ")}!`);
             setFiles({ pitchDeck: null, financials: null, founderProfile: null });
-            setSelectedInvestor(null);
+            setSelectedInvestors([]);
             setCompanyName("");
             setLinkedinUrl("");
             const apps = await api.getEntrepreneurApplications(user._id);
@@ -126,7 +130,19 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
 
                         {/* File Uploads */}
                         <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                            <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem" }}>Upload Documents</h3>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                <h3 style={{ fontSize: "1.1rem" }}>Upload Documents</h3>
+                                <button className="btn" onClick={() => {
+                                    const csv = `Metric,Current,Projected\nAnnual Revenue,,\nMonthly Burn Rate,,\nExisting Cash on Hand,,\nTarget Raise Amount,,\nPre-Money Valuation,,\nAnnual Growth Rate,,\nTAM,,`;
+                                    const blob = new Blob([csv], { type: "text/csv" });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url; a.download = "financial_template.csv";
+                                    a.click(); URL.revokeObjectURL(url);
+                                }} style={{ padding: "0.35rem 0.85rem", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                    <Download size={13} /> CSV Template
+                                </button>
+                            </div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
                                 <MiniUpload label="Pitch Deck" accept=".pdf" file={files.pitchDeck}
                                     onChange={(e) => handleFileChange(e, "pitchDeck")} Icon={LayoutTemplate} color="var(--terracotta)" />
@@ -139,7 +155,14 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
 
                         {/* Investor Selection */}
                         <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                            <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem" }}>Select an Investor</h3>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                <h3 style={{ fontSize: "1.1rem" }}>Select Investors</h3>
+                                {selectedInvestors.length > 0 && (
+                                    <span className="badge badge--green" style={{ fontSize: "0.72rem" }}>
+                                        {selectedInvestors.length} selected
+                                    </span>
+                                )}
+                            </div>
 
                             <div style={{ position: "relative", marginBottom: "1rem" }}>
                                 <Search size={16} style={{
@@ -154,43 +177,59 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
                             </div>
 
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: 320, overflowY: "auto" }}>
-                                {filteredInvestors.map(inv => (
-                                    <div key={inv._id} onClick={() => setSelectedInvestor(inv)}
-                                        style={{
-                                            display: "flex", alignItems: "center", gap: "1rem",
-                                            padding: "1rem", borderRadius: "var(--radius-sm)",
-                                            border: `2px solid ${selectedInvestor?._id === inv._id ? "var(--terracotta)" : "var(--light-border)"}`,
-                                            background: selectedInvestor?._id === inv._id ? "var(--terracotta-light)" : "var(--bg-card)",
-                                            cursor: "pointer", transition: "all 0.2s ease"
-                                        }}>
-                                        <div style={{
-                                            width: 44, height: 44, borderRadius: "50%",
-                                            background: "var(--bg-elevated)", display: "flex",
-                                            alignItems: "center", justifyContent: "center",
-                                            fontWeight: 700, fontSize: "1rem", color: "var(--charcoal)",
-                                            flexShrink: 0
-                                        }}>
-                                            {inv.name.charAt(0)}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{inv.name}</div>
-                                            <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.2rem" }}>
-                                                <span style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
-                                                    <Briefcase size={12} /> {inv.investor_type?.replace("_", " ")}
-                                                </span>
-                                                <span style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
-                                                    <MapPin size={12} /> {(inv.geographies || []).join(", ")}
-                                                </span>
+                                {filteredInvestors.map(inv => {
+                                    const isSelected = selectedInvestors.some(s => s._id === inv._id);
+                                    return (
+                                        <div key={inv._id} onClick={() => {
+                                            setSelectedInvestors(prev =>
+                                                isSelected
+                                                    ? prev.filter(s => s._id !== inv._id)
+                                                    : [...prev, inv]
+                                            );
+                                        }}
+                                            style={{
+                                                display: "flex", alignItems: "center", gap: "1rem",
+                                                padding: "1rem", borderRadius: "var(--radius-sm)",
+                                                border: `2px solid ${isSelected ? "var(--terracotta)" : "var(--light-border)"}`,
+                                                background: isSelected ? "var(--terracotta-light)" : "var(--bg-card)",
+                                                cursor: "pointer", transition: "all 0.2s ease"
+                                            }}>
+                                            {/* Checkbox indicator */}
+                                            <div style={{
+                                                width: 22, height: 22, borderRadius: 4, flexShrink: 0,
+                                                border: `2px solid ${isSelected ? "var(--terracotta)" : "var(--light-border)"}`,
+                                                background: isSelected ? "var(--terracotta)" : "transparent",
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                transition: "all 0.2s ease"
+                                            }}>
+                                                {isSelected && <CheckCircle2 size={14} color="#fff" />}
                                             </div>
-                                            <div style={{ fontSize: "0.72rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
-                                                Sectors: {(inv.sectors || []).join(", ")}
+                                            <div style={{
+                                                width: 44, height: 44, borderRadius: "50%",
+                                                background: "var(--bg-elevated)", display: "flex",
+                                                alignItems: "center", justifyContent: "center",
+                                                fontWeight: 700, fontSize: "1rem", color: "var(--charcoal)",
+                                                flexShrink: 0
+                                            }}>
+                                                {inv.name.charAt(0)}
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{inv.name}</div>
+                                                <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.2rem" }}>
+                                                    <span style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                                                        <Briefcase size={12} /> {inv.investor_type?.replace("_", " ")}
+                                                    </span>
+                                                    <span style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                                                        <MapPin size={12} /> {(inv.geographies || []).join(", ")}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: "0.72rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
+                                                    Sectors: {(inv.sectors || []).join(", ")}
+                                                </div>
                                             </div>
                                         </div>
-                                        {selectedInvestor?._id === inv._id && (
-                                            <CheckCircle2 size={22} color="var(--terracotta)" />
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {filteredInvestors.length === 0 && (
                                     <p style={{ textAlign: "center", color: "var(--warm-gray)", padding: "1rem" }}>No investors found.</p>
                                 )}
@@ -205,7 +244,7 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
                         <div style={{ display: "flex", justifyContent: "center" }}>
                             <button className="btn btn--accent" onClick={handleSubmit} disabled={!allReady || submitting}
                                 style={{ padding: "0.85rem 2.5rem", fontSize: "1rem" }}>
-                                <Send size={18} /> {submitting ? "Submitting…" : "Submit Application"}
+                                <Send size={18} /> {submitting ? "Submitting…" : `Submit to ${selectedInvestors.length || 0} Investor${selectedInvestors.length !== 1 ? "s" : ""}`}
                             </button>
                         </div>
                     </div>
@@ -290,15 +329,12 @@ export function Header({ user, apiOnline, onLogout }) {
         }}>
             <div className="container" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <div style={{
+                    <img src="/cynt-logo.png" alt="Cynt" style={{
                         width: 36, height: 36, borderRadius: "var(--radius-sm)",
-                        background: "var(--charcoal)", display: "flex",
-                        alignItems: "center", justifyContent: "center"
-                    }}>
-                        <Activity size={18} color="#FAF7F2" />
-                    </div>
+                        objectFit: "contain"
+                    }} />
                     <div>
-                        <h1 style={{ fontSize: "1rem", fontFamily: "var(--font-display)", lineHeight: 1 }}>Due Diligence</h1>
+                        <h1 style={{ fontSize: "1rem", fontFamily: "var(--font-display)", lineHeight: 1 }}>Cynt</h1>
                         <span style={{ fontSize: "0.6rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--warm-gray)" }}>
                             {user.role === "investor" ? "Investor Portal" : "Entrepreneur Portal"}
                         </span>

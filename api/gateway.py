@@ -20,6 +20,7 @@ from utils.db import (
     get_collaborations_collection,
 )
 from utils.linkedin_scraper import scrape_and_store_linkedin
+from utils.email_sender import send_decision_email
 
 app = FastAPI(
     title="AI Startup Due Diligence Engine",
@@ -309,6 +310,23 @@ async def set_application_decision(app_id: str, payload: str = Form(...)):
             "decision_at": _now(),
         }},
     )
+
+    # ── Email notification to entrepreneur ────────────────────────────────
+    try:
+        entrepreneur_id = app_doc.get("entrepreneur_id")
+        company_name = app_doc.get("company_name", "your startup")
+        if entrepreneur_id:
+            users = get_users_collection()
+            entrepreneur = users.find_one({"_id": _oid(entrepreneur_id)})
+            if entrepreneur and entrepreneur.get("email"):
+                send_decision_email(
+                    to_email=entrepreneur["email"],
+                    company_name=company_name,
+                    decision=decision,
+                    message=message,
+                )
+    except Exception as e:
+        print(f"⚠️  Email notification failed (non-blocking): {e}")
 
     updated = apps.find_one({"_id": _oid(app_id)})
     return _serialize_app(updated)
