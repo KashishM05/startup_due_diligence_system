@@ -19,13 +19,23 @@ Cynt is a **B2B investment intelligence platform** that connects entrepreneurs a
 
 ---
 
+## Key Features
+- Multi-agent AI pipeline for automated startup due diligence
+- Document ingestion from pitch decks, financial spreadsheets, and founder profiles
+- Deterministic financial simulations and market signal analysis
+- AI-generated investment memo with structured risk analysis
+- Collaboration workflow enabling multiple investors to evaluate the same startup
+- Automated email notifications informing entrepreneurs when applications are **approved or rejected**, including the **investor decision and message**
+
 ## Technology Stack
-Backend: Python, FastAPI
-Frontend: React (Vite)
-Database: MongoDB
-LLM: Groq via LangChain
-Containerization: Docker
-External APIs: Google Trends, NewsAPI, LinkedIn (RapidAPI)
+| Layer | Technology |
+|------|------------|
+| Backend | Python, FastAPI |
+| Frontend | React (Vite) |
+| Database | MongoDB |
+| LLM | Groq (LangChain) |
+| Containerization | Docker |
+| External APIs | Google Trends, NewsAPI, LinkedIn |
 
 ## Architecture
 
@@ -124,56 +134,16 @@ cynt_due_diligence/
 ---
 
 ## Core Modules
-
-### Document Processor
-Extracts a structured `StartupProfile` from three uploaded documents:
-| Input | Format | How processed |
-|---|---|---|
-| Pitch deck | PDF | `pypdf.PdfReader` — text extracted per page |
-| Financials | CSV or XLSX | `pandas.read_csv` / `read_excel` |
-| Founder profile | PDF | `pypdf.PdfReader` |
-
-**Two-phase extraction:**
-1. **Deterministic CSV parse** (`parse_financial_csv`): looks for standard metric rows (`Annual Revenue`, `Monthly Burn Rate`, `Existing Cash on Hand`, `Target Raise Amount`, `Pre-Money Valuation`, `Annual Growth Rate`, `TAM`) in a `Metric, Current, Projected` CSV format. These values **always override** LLM estimates for financial fields.
-2. **LLM extraction** (`ChatGroq llama-3.3-70b-versatile`): given the first 6000 chars of pitch deck + 3000 chars each of financials and founder profile, extracts a JSON object with ~19 fields covering company basics, market claims, financials, and founder info.
-3. **LinkedIn enrichment**: if a LinkedIn URL (`linkedin.com/in/...`) is found in founder text or pitch deck, `linkedin_fetcher.fetch_linkedin_profile()` is called first (MongoDB cache), then attaches `LinkedInProfile` to the `StartupProfile`.
-
----
-
-### Financial Simulation Engine
-Fully **deterministic** (no LLM). Takes a `StartupProfile` and computes:
-| Metric | Formula |
-|---|---|
-| `runway_months` | `(existing_cash + raise_amount) / net_monthly_burn` |
-| `burn_multiple` | `annual_burn / net_new_ARR` (burn per $1 of new ARR grown) |
-| `dilution_pct` | `raise_amount / (pre_money_val + raise_amount) × 100` |
-| `bankruptcy_projection_months` | `existing_cash / net_monthly_burn` (without the new raise) |
-| `capital_efficiency_ratio` | `revenue / total_capital` |
-Where `net_burn = max(monthly_burn - monthly_revenue, 0)`.
-
----
-
-### Market Signal Connector
-Fetches external market signals and normalises them to 0–100:
-| Signal | Source | Caching |
-|---|---|---|
-| `google_trends_score` | `pytrends` — 12-month interest for sector keyword | `@lru_cache(128)` |
-| `news_frequency_score` | News API — total article count (log-normalised, cap 100) | `@lru_cache(128)` |
-| `composite_signal_score` | `0.5 × trends + 0.5 × news` | derived |
-Falls back to `50.0` for any signal if API key is missing or call fails.
-
----
-
-### Memo Generator
-Renders a plain-text **investment memo** using Jinja2 from the complete `DueDiligenceResult`. Fully deterministic — no LLM. The template covers:
-- Company header (name, sector, stage, geography, founder, raise, valuation)
-- Final recommendation + decision score + check size tier
-- Score dashboard (4 scores)
-- Financial analysis (runway, burn multiple, dilution, bankruptcy, capital efficiency, valuation flag, key risks)
-- Market validation (TAM, growth %, external signals, key risks)
-- Founder assessment (all sub-scores, risk level, key risks)
-- Aggregate key risks
-- Required milestones
+**Document Processor**  
+Extracts structured startup data from pitch decks, financial spreadsheets, and founder profiles.
+**Financial Simulation Engine**  
+Computes financial health metrics such as runway, burn efficiency, dilution, and capital efficiency.
+**Market Signal Connector**  
+Fetches external market signals from Google Trends and news activity to estimate market momentum.
+**Memo Generator**  
+Produces a structured investment memo summarizing analysis results and risks.
+**Pipeline Orchestrator**  
+Coordinates the full asynchronous analysis pipeline and aggregates agent outputs.
 
 ---
 
@@ -183,7 +153,7 @@ There are three specialized AI agents:
 - Financial Risk Agent – evaluates burn rate, runway, and valuation realism.
 - Market Validation Agent – analyzes market demand signals and competitive saturation.
 - Founder Intelligence Agent – evaluates founder experience, network strength, and execution credibility.
-A final meta-agent combines the results to produce a deterministic investment recommendation.
+A final decision engine aggregates the agent scores using deterministic weighting and generates the final investment recommendation.
 
 ---
 
@@ -205,23 +175,71 @@ API base URL auto-detects environment: Vite dev server (port 5170–5180) → `l
 ---
 
 ### Entrepreneur Flow
-**`EntrepreneurDashboard.jsx`:**
-- Shows a list of all submitted applications (company name, target investor, status badge, date).
-- **"Apply to Investor"** button → opens a multi-step wizard:
-  1. **Step1_Upload** — upload pitch deck (PDF), financials (CSV/XLSX), founder profile (PDF), enter company name and LinkedIn URL, select target investor(s).
-  2. **Step2_Config** — (legacy wizard step for portfolio config).
-  3. **Step3_Analyzing** — animated progress screen during pipeline execution.
-  4. **Step4_Results** — displays the full `DueDiligenceResult`: score dashboard (cards + Recharts bar chart), financial simulation table, market signals, founder assessment, investment decision, and the raw text memo. Includes **PDF export** via `html2pdf.js`.
-- Application statuses displayed: `Pending`, `Analyzed`, `Accepted`, `Rejected`.
+**Dashboard**
+Entrepreneurs can view and manage all of their submitted applications. The dashboard displays:
+- Company name
+- Target investor
+- Application status
+- Submission date
+
+**Apply to Investor**
+The **"Apply to Investor"** button opens a submission wizard:
+**Upload required files and startup details:**
+  - Pitch deck (PDF)
+  - Financials (CSV/XLSX)
+  - Founder profile (PDF)
+  - Company name
+  - Founder LinkedIn URL
+  - Target investor(s)
+
+**Application Status**
+Applications appear in the dashboard with one of the following statuses:
+- `Pending`
+- `Analyzed`
+- `Accepted`
+- `Rejected`
+
+Entrepreneurs also receive **email notifications from Cynt** when investors approve or reject their application.
+
+---
 
 ### Investor Flow
-**Tabs:**
-1. **Applications** — all incoming applications (direct + collab-invited). For each:
-   - View documents, trigger AI analysis, view results, send collaboration invite to another investor.
-   - Accept or reject with optional message.
-   - Deal summary showing all investors and collaborators on a startup.
-2. **Invites** — all pending collaboration invites received. Can assess (run AI pipeline) and then accept/reject.
-3. **Collaboration Hub** — decided invites (accepted + rejected) for both sent and received. Shows who invited whom and the final outcome.
+Investors review incoming startup applications and perform AI-powered due diligence.
+The **Investor Dashboard** contains three primary tabs.
+
+#### Applications
+Displays all startups submitted directly to the investor as well as applications shared through collaboration.
+For each application, investors can:
+- View uploaded documents
+- Trigger the **AI analysis pipeline**
+- Review the full **analysis results**, including:
+  - Score dashboard (visual cards + Recharts chart)
+  - Financial simulation results
+  - Market signal analysis
+  - Founder assessment
+  - Final investment decision
+  - Generated investment memo
+
+Results can also be exported as a **PDF report**.
+
+Investors may then:
+- **Accept** or **Reject** the startup (with an optional message to the entrepreneur)
+- **Invite other investors** to collaborate on the evaluation
+- View a **deal summary** showing all participating investors and collaboration activity.
+
+#### Invites
+Shows all **pending collaboration invites** received from other investors.
+Invited investors must first **run their own AI assessment** before deciding whether to join the collaboration.
+They can then:
+- Accept the collaboration
+- Reject the collaboration
+
+#### Collaboration Hub
+Displays all **decided collaboration invitations** (both sent and received), including:
+- Accepted collaborations
+- Rejected invitations
+- Which investor invited whom
+- The final collaboration outcome
 
 ---
 
