@@ -1,3 +1,13 @@
+---
+title: Cynt — AI-Powered Startup Due Diligence System
+emoji: 📊
+colorFrom: purple
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Cynt — AI-Powered Startup Due Diligence System
 
 > **Cynt** is a full-stack platform that automates startup investment due diligence using a multi-agent AI pipeline. Entrepreneurs submit their documents; investors receive structured analysis, scores, and a go/no-go recommendation — all in minutes.
